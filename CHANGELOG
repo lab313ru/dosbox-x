@@ -1,8 +1,34 @@
 0.83.13
+  - S386C928 hardware cursor fixed to divide X coordinate
+    by bytes per pixel indicated in the control register
+    to match apparent Windows 3.1/95 behavior. Cursor
+    now tracks host properly even in highcolor/truecolor
+    modes.
+  - Added support for the RetroWave OPL3 hardware player.
+    Set "oplemu=retrowave_opl3" in [sblaster] section of
+    the config file to use it. Config options including
+    "retrowave_bus", "retrowave_spi_cs", "retrowave_port"
+    are added to adjust its settings. (ClassicOldSong)
+  - Added support for S386C928 hardware cursor color
+    selection in 256-color mode, which is different
+    from later cards.
   - S3 XGA "BYTE SWP" fixed only to byte swap if the
     transfer is 16-bit wide. This fixes the dither
     pattern drawn by Windows 95/98 when you select
     "Shutdown" from the Start menu.
+  - Added config options "working directory option" and
+    "working directory default" in [dosbox] section of
+    the config file to provide various options for the
+    users to control DOSBox-X's working directory. For
+    example, DOSBox-X can use the primary config file
+    directory or the DOSBox-X program directory as its
+    working directory. You can view the DOSBox-X'safe
+    working directory with CONFIG -L command. DOSBox-X
+    is also able to save the working directory that a
+    user selects to global config files. (Wengier)
+  - Added new command-line options -promptfolder and
+    -nopromptfolder which will cause the folder prompt
+    dialogs to show or not to show at startup.
   - Mac OS X builds will prompt the user to select a
     folder at startup if run from the Finder (or from
     the root directory). The folder selected will then
@@ -92,6 +118,10 @@
     version 2.5.0. (Wengier)
   - Updated FLAC decoder library to the latest version
     (0.12.29 by David Reid). (Wengier)
+  - Integrated SVN commits (Allofich)
+    - r4447: Attribute Controller port alias on EGA
+    machine. Fixes EGA display of older Super Pac-Man
+    release.
 0.83.12
   - Tandy graphics emulation fixed to accept 8 bits
     for vertical total and vertical display CRTC
