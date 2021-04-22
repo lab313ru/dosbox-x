@@ -16,6 +16,27 @@
  *  51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  */
 
+#include "gen-cpp/IdaClient.h"
+#include "gen-cpp/DosboxDebugger.h"
+#include <thrift/protocol/TBinaryProtocol.h>
+#include <thrift/transport/TSocket.h>
+#include <thrift/transport/TBufferTransports.h>
+#include <thrift/server/TNonblockingServer.h>
+#include <thrift/transport/TNonblockingServerSocket.h>
+#include <thrift/concurrency/ThreadFactory.h>
+
+using namespace ::apache::thrift;
+using namespace ::apache::thrift::protocol;
+using namespace ::apache::thrift::transport;
+using namespace ::apache::thrift::server;
+using namespace ::apache::thrift::concurrency;
+
+static ::std::shared_ptr<IdaClientClient> client;
+static ::std::shared_ptr<TNonblockingServer> srv;
+static ::std::shared_ptr<TTransport> cli_transport;
+
+static ::std::mutex list_mutex;
+
 
 #include "dosbox.h"
 #if C_DEBUG
@@ -508,17 +529,21 @@ public:
 
 	// statics
 	static CBreakpoint*		AddBreakpoint		(uint16_t seg, uint32_t off, bool once);
+    static CBreakpoint*		AddBreakpoint		(PhysPt addr, bool once);
 	static CBreakpoint*		AddIntBreakpoint	(uint8_t intNum, uint16_t ah, uint16_t al, bool once);
 	static CBreakpoint*		AddMemBreakpoint	(uint16_t seg, uint32_t off);
+    static CBreakpoint*		AddMemBreakpoint	(PhysPt addr);
 	static void				DeactivateBreakpoints();
 	static void				ActivateBreakpoints	();
 	static void				ActivateBreakpointsExceptAt(PhysPt adr);
 	static bool				CheckBreakpoint		(uint16_t seg, uint32_t off);
 	static bool				CheckIntBreakpoint	(PhysPt adr, uint8_t intNr, uint16_t ahValue, uint16_t alValue);
 	static CBreakpoint*		FindPhysBreakpoint	(uint16_t seg, uint32_t off, bool once);
+    static CBreakpoint*		FindPhysBreakpoint	(PhysPt addr, bool once);
 	static CBreakpoint*		FindOtherActiveBreakpoint(PhysPt adr, CBreakpoint* skip);
 	static bool				IsBreakpoint		(uint16_t seg, uint32_t off);
 	static bool				DeleteBreakpoint	(uint16_t seg, uint32_t off);
+    static bool				DeleteBreakpoint	(PhysPt addr);
 	static bool				DeleteByIndex		(uint16_t index);
 	static void				DeleteAll			(void);
 	static void				ShowList			(void);
@@ -602,6 +627,15 @@ CBreakpoint* CBreakpoint::AddBreakpoint(uint16_t seg, uint32_t off, bool once)
 	return bp;
 }
 
+CBreakpoint* CBreakpoint::AddBreakpoint(PhysPt addr, bool once)
+{
+    CBreakpoint* bp = new CBreakpoint();
+    bp->SetAddress(addr);
+    bp->SetOnce(once);
+    BPoints.push_front(bp);
+    return bp;
+}
+
 CBreakpoint* CBreakpoint::AddIntBreakpoint(uint8_t intNum, uint16_t ah, uint16_t al, bool once)
 {
 	CBreakpoint* bp = new CBreakpoint();
@@ -619,6 +653,16 @@ CBreakpoint* CBreakpoint::AddMemBreakpoint(uint16_t seg, uint32_t off)
 	bp->SetType			(BKPNT_MEMORY);
 	BPoints.push_front	(bp);
 	return bp;
+}
+
+CBreakpoint* CBreakpoint::AddMemBreakpoint(PhysPt addr)
+{
+    CBreakpoint* bp = new CBreakpoint();
+    bp->SetAddress(addr);
+    bp->SetOnce(false);
+    bp->SetType(BKPNT_MEMORY);
+    BPoints.push_front(bp);
+    return bp;
 }
 
 void CBreakpoint::ActivateBreakpoints()
@@ -650,6 +694,8 @@ void CBreakpoint::ActivateBreakpointsExceptAt(PhysPt adr)
 	}
 }
 
+extern void send_pause_event(bool is_step);
+
 bool CBreakpoint::CheckBreakpoint(uint16_t seg, uint32_t off)
 // Checks if breakpoint is valid and should stop execution
 {
@@ -677,6 +723,8 @@ bool CBreakpoint::CheckBreakpoint(uint16_t seg, uint32_t off)
 					delete bp;
 				}
 			}
+
+            send_pause_event(bp ? bp->GetOnce() : false);
 			return true;
 		}
 #if C_HEAVY_DEBUG
@@ -702,6 +750,8 @@ bool CBreakpoint::CheckBreakpoint(uint16_t seg, uint32_t off)
 					// Yup, memory value changed
 					DEBUG_ShowMsg("DEBUG: Memory breakpoint %s: %04X:%04X - %02X -> %02X\n",(bp->GetType()==BKPNT_MEMORY_PROT)?"(Prot)":"",bp->GetSegment(),bp->GetOffset(),bp->GetValue(),value);
 					bp->SetValue(value);
+
+                    send_pause_event(false);
 					return true;
 				}
 			}
@@ -733,6 +783,8 @@ bool CBreakpoint::CheckIntBreakpoint(PhysPt adr, uint8_t intNr, uint16_t ahValue
 					bp->Activate(false);
 					delete bp;
 				}
+
+                send_pause_event(bp->GetOnce());
 				return true;
 			}
 		}
@@ -797,6 +849,25 @@ CBreakpoint* CBreakpoint::FindPhysBreakpoint(uint16_t seg, uint32_t off, bool on
 	return 0;
 }
 
+CBreakpoint* CBreakpoint::FindPhysBreakpoint(PhysPt addr, bool once)
+{
+    if(BPoints.empty()) return 0;
+    // Search for matching breakpoint
+    std::list<CBreakpoint*>::iterator i;
+    CBreakpoint* bp;
+    for(i = BPoints.begin(); i != BPoints.end(); ++i) {
+        bp = (*i);
+
+        // Normal debugging breakpoints are triggered at an address
+        bool atLocation = bp->GetLocation() == addr;
+
+        if(bp->GetType() == BKPNT_PHYSICAL && atLocation && bp->GetOnce() == once)
+            return bp;
+    }
+
+    return 0;
+}
+
 CBreakpoint* CBreakpoint::FindOtherActiveBreakpoint(PhysPt adr, CBreakpoint* skip)
 {
 	std::list<CBreakpoint*>::iterator i;
@@ -824,6 +895,18 @@ bool CBreakpoint::DeleteBreakpoint(uint16_t seg, uint32_t off)
 	}
 
 	return false;
+}
+
+bool CBreakpoint::DeleteBreakpoint(PhysPt addr)
+{
+    CBreakpoint* bp = FindPhysBreakpoint(addr, false);
+    if(bp) {
+        BPoints.remove(bp);
+        delete bp;
+        return true;
+    }
+
+    return false;
 }
 
 
@@ -858,6 +941,8 @@ bool DEBUG_Breakpoint(void)
 	// Found. Breakpoint is valid
 //	PhysPt where=(PhysPt)GetAddress(SegValue(cs),reg_eip);
 	CBreakpoint::DeactivateBreakpoints();	// Deactivate all breakpoints
+
+    send_pause_event(true);
 	return true;
 }
 
@@ -869,6 +954,8 @@ bool DEBUG_IntBreakpoint(uint8_t intNum)
 	if (!CBreakpoint::CheckIntBreakpoint(where,intNum,reg_ah,reg_al)) return false;
 	// Found. Breakpoint is valid
 	CBreakpoint::DeactivateBreakpoints();	// Deactivate all breakpoints
+
+    send_pause_event(true);
 	return true;
 }
 
@@ -3372,7 +3459,7 @@ Bitu DEBUG_Loop(void) {
         uint32_t oldEIP	= reg_eip;
         PIC_runIRQs();
         SDL_Delay(1);
-        if ((oldCS!=SegValue(cs)) || (oldEIP!=reg_eip)) {
+        /*if ((oldCS!=SegValue(cs)) || (oldEIP!=reg_eip)) {
             CBreakpoint::AddBreakpoint(oldCS,oldEIP,true);
             CBreakpoint::ActivateBreakpointsExceptAt(SegPhys(cs)+reg_eip);
             debugging=false;
@@ -3387,7 +3474,7 @@ Bitu DEBUG_Loop(void) {
             DOSBOX_SetNormalLoop();
             DrawRegistersUpdateOld();
             return 0;
-        }
+        }*/
 
         /* between DEBUG_Enable and DEBUG_Loop CS:EIP can change */
         if (check_rescroll) {
@@ -4619,4 +4706,414 @@ void DEBUG_StopLog(void) {
 
 #endif // DEBUG
 
+static void stop_client() {
+    try {
+        if(client) {
+            client->stop_event();
+        }
+        cli_transport->close();
+    }
+    catch(...) {
 
+    }
+
+    debug_running = false;
+}
+
+static void init_ida_client() {
+    ::std::shared_ptr<TTransport> socket(new TSocket("127.0.0.1", 9091));
+    cli_transport = ::std::shared_ptr<TTransport>(new TFramedTransport(socket));
+    ::std::shared_ptr<TBinaryProtocol> protocol(new TBinaryProtocol(cli_transport));
+    client = ::std::shared_ptr<IdaClientClient>(new IdaClientClient(protocol));
+
+    while(true) {
+        try {
+            cli_transport->open();
+            break;
+        }
+        catch(...) {
+            Sleep(10);
+        }
+    }
+
+    atexit(stop_client);
+}
+
+class DosboxDebuggerHandler : virtual public DosboxDebuggerIf {
+private:
+    inline uint64_t find_app_base()
+    {
+        uint64_t base = (uint64_t)GetAddress(SegValue(cs), 0);
+        uint64_t addr = (uint64_t)GetAddress(SegValue(ds), 0);
+
+        if(addr < base) {
+            base = addr;
+        }
+
+        addr = (uint64_t)GetAddress(SegValue(ss), 0);
+
+        if(addr < base) {
+            base = addr;
+        }
+
+        return base;
+    }
+
+    void DbgContinue(Bits ret, bool skipDraw) {
+        if(ret < 0) return;
+        if(ret > 0) {
+            if(GCC_UNLIKELY(ret >= (Bits)CB_MAX))
+                ret = 0;
+            else
+                ret = (Bits)(*CallBack_Handlers[ret])();
+            if(ret) {
+                exitLoop = true;
+                CPU_Cycles = CPU_CycleLeft = 0;
+                return;
+            }
+        }
+
+        if (!skipDraw) {
+            DEBUG_DrawScreen();
+        }
+    }
+
+    void DbgStepInto(Bits ret, bool skipDraw) {
+        DrawRegistersUpdateOld();
+        exitLoop = false;
+        skipFirstInstruction = true; // for heavy debugger
+        mustCompleteInstruction = true;
+        CPU_Cycles = 1;
+        ret = (*cpudecoder)();
+        SetCodeWinStart();
+
+        DbgContinue(ret, skipDraw);
+        send_pause_event(!skipDraw);
+    }
+
+    void DbgStepOver() {
+        Bits ret = 0;
+
+        DrawRegistersUpdateOld();
+        if(StepOver()) {
+            mustCompleteInstruction = true;
+            inhibit_int_breakpoint = true;
+            skipFirstInstruction = true; // for heavy debugger
+            CPU_Cycles = 1;
+            ret = (*cpudecoder)();
+            inhibit_int_breakpoint = false;
+            mustCompleteInstruction = false;
+
+            DOSBOX_SetNormalLoop();
+
+            // ensure all breakpoints are activated
+            CBreakpoint::ActivateBreakpoints();
+            DbgContinue(ret, true);
+        } else {
+            DbgStepInto(ret, false);
+        }
+    }
+
+    void DbgContinue() {
+        Bitu ret = 0;
+
+        DrawRegistersUpdateOld();
+        debugging = false;
+        DrawCode();
+        DrawInput();
+        logBuffSuppressConsole = false;
+        if(logBuffSuppressConsoleNeedUpdate) {
+            logBuffSuppressConsoleNeedUpdate = false;
+            DEBUG_RefreshPage(0);
+        }
+
+        Bits DEBUG_NullCPUCore(void);
+
+        CPU_Cycles = 1;
+        inhibit_int_breakpoint = true;
+        if(cpudecoder == DEBUG_NullCPUCore)
+            ret = -1; /* DEBUG_Loop() must exit */
+        else
+            ret = (*cpudecoder)();
+
+        inhibit_int_breakpoint = false;
+        mainMenu.get_item("mapper_debugger").check(false).refresh_item(mainMenu);
+
+        skipFirstInstruction = true; // for heavy debugger
+        CPU_Cycles = 1;
+
+        // ensure all breakpoints are activated
+        CBreakpoint::ActivateBreakpoints();
+
+        DOSBOX_SetNormalLoop();
+
+        DbgContinue(ret, true);
+    }
+
+public:
+    void add_breakpoint(const DbgBreakpoint& bpt) override {
+        if (bpt.type == BpType::BP_PC) {
+            CBreakpoint::AddBreakpoint(bpt.phys_addr, false);
+        } else {
+            CBreakpoint::AddMemBreakpoint(bpt.phys_addr);
+        }
+    }
+
+    void del_breakpoint(const DbgBreakpoint& bpt) override {
+        CBreakpoint::DeleteBreakpoint(bpt.phys_addr);
+    }
+
+    void exit_emulation() override {
+        try {
+            if(client) {
+                client->stop_event();
+            }
+        }
+        catch(...) {
+
+        }
+
+        DEBUG_ShutDown(NULL);
+    }
+
+    int32_t get_cpu_reg(const CpuRegister::type reg) override {
+        switch (reg) {
+        case CpuRegister::EAX:
+            return reg_eax;
+        case CpuRegister::EBX:
+            return reg_eax;
+        case CpuRegister::ECX:
+            return reg_eax;
+        case CpuRegister::EDX:
+            return reg_eax;
+        case CpuRegister::ESI:
+            return reg_eax;
+        case CpuRegister::EDI:
+            return reg_eax;
+        case CpuRegister::EBP:
+            return reg_eax;
+        case CpuRegister::EIP:
+            return reg_eip;
+        case CpuRegister::FLAGS:
+            return reg_flags;
+        default:
+            return 0;
+        }
+    }
+
+    void get_cpu_regs(CpuRegisters& _return) override {
+        _return.EAX = reg_eax;
+        _return.EBX = reg_ebx;
+        _return.ECX = reg_ecx;
+        _return.EDX = reg_edx;
+        _return.ESI = reg_esi;
+        _return.EDI = reg_edi;
+        _return.EBP = reg_ebp;
+        _return.ESP = reg_esp;
+        _return.EIP = reg_eip;
+        _return.FLAGS = reg_flags;
+    }
+
+    double get_fpu_reg(const FpuRegister::type reg) override {
+        return fpu.regs[static_cast<int>(reg)].d;
+    }
+
+    void get_fpu_regs(FpuRegisters& _return) override {
+        _return.ST0 = fpu.regs[0].d;
+        _return.ST1 = fpu.regs[1].d;
+        _return.ST2 = fpu.regs[2].d;
+        _return.ST3 = fpu.regs[3].d;
+        _return.ST4 = fpu.regs[4].d;
+        _return.ST5 = fpu.regs[5].d;
+        _return.ST6 = fpu.regs[6].d;
+        _return.ST7 = fpu.regs[7].d;
+    }
+
+    void pause() override {
+        DEBUG_EnableDebugger();
+    }
+
+    void read_memory(std::string& _return, const int32_t address, const int32_t size) override {
+        _return = "";
+
+        for (auto i = 0; i < size; ++i) {
+            uint8_t value;
+
+            if (!mem_readb_checked((PhysPt)(address+i),&value)) {
+                _return += value;
+            } else {
+                _return += '\x00';
+            }
+        }
+    }
+
+    void resume() override {
+        DbgContinue();
+    }
+
+    void set_cpu_reg(const CpuRegister::type reg, const int32_t value) override {
+        switch(reg) {
+        case CpuRegister::EAX:
+            reg_eax = value;
+            break;
+        case CpuRegister::EBX:
+            reg_eax = value;
+            break;
+        case CpuRegister::ECX:
+            reg_eax = value;
+            break;
+        case CpuRegister::EDX:
+            reg_eax = value;
+            break;
+        case CpuRegister::ESI:
+            reg_eax = value;
+            break;
+        case CpuRegister::EDI:
+            reg_eax = value;
+            break;
+        case CpuRegister::EBP:
+            reg_eax = value;
+            break;
+        case CpuRegister::EIP:
+            reg_eip = value;
+            break;
+        case CpuRegister::FLAGS:
+            reg_flags = value;
+            break;
+        }
+    }
+
+    void set_fpu_reg(const FpuRegister::type reg, const double value) override {
+        fpu.regs[static_cast<int>(reg)].d = value;
+    }
+
+    void start_emulation() override {
+        init_ida_client();
+
+        try {
+            if(client) {
+                client->start_event(SegPhys(cs));
+                client->pause_event(SegValue(cs), reg_eip);
+            }
+        }
+        catch(...) {
+
+        }
+    }
+
+    void step_into() override {
+        DbgStepInto(0, false);
+    }
+
+    void step_over() override {
+        DbgStepOver();
+    }
+
+    void write_memory(const int32_t address, const std::string& data) override {
+        for(auto i = 0; i < data.length(); ++i) {
+            mem_writeb_checked((PhysPt)(address + i), data[i]);
+        }
+    }
+
+    int16_t get_seg_reg(const SegRegister::type reg) override {
+        switch (reg) {
+        case SegRegister::CS:
+            return SegValue(cs);
+        case SegRegister::DS:
+            return SegValue(ds);
+        case SegRegister::ES:
+            return SegValue(es);
+        case SegRegister::FS:
+            return SegValue(fs);
+        case SegRegister::GS:
+            return SegValue(gs);
+        case SegRegister::SS:
+            return SegValue(ss);
+        }
+    }
+
+    void get_seg_regs(SegRegisters& _return) override {
+        _return.CS = SegValue(cs);
+        _return.DS = SegValue(ds);
+        _return.ES = SegValue(es);
+        _return.FS = SegValue(fs);
+        _return.GS = SegValue(gs);
+        _return.SS = SegValue(ss);
+    }
+
+    void set_seg_reg(const SegRegister::type reg, const int16_t value) override {
+        switch (reg) {
+        case SegRegister::CS:
+            SegSet16(cs, value);
+            break;
+        case SegRegister::DS:
+            SegSet16(ds, value);
+            break;
+        case SegRegister::ES:
+            SegSet16(es, value);
+            break;
+        case SegRegister::FS:
+            SegSet16(fs, value);
+            break;
+        case SegRegister::GS:
+            SegSet16(gs, value);
+            break;
+        case SegRegister::SS:
+            SegSet16(ss, value);
+            break;
+        }
+    }
+
+    int32_t get_seg_base(const int16_t seg_val) override {
+        for (auto i = 0; i < sizeof(Segs.val)/sizeof(Segs.val[0]); ++i) {
+            if (Segs.val[i] == seg_val) {
+                return Segs.phys[i];
+            }
+        }
+
+        return 0;
+    }
+
+    void get_seg_bases(SegBases& _return) override {
+        _return.CS_BASE = SegPhys(cs);
+        _return.DS_BASE = SegPhys(ds);
+        _return.ES_BASE = SegPhys(es);
+        _return.FS_BASE = SegPhys(fs);
+        _return.GS_BASE = SegPhys(gs);
+        _return.SS_BASE = SegPhys(ss);
+    }
+
+};
+
+static void stop_server() {
+    srv->stop();
+}
+
+void init_dbg_server() {
+    ::std::shared_ptr<DosboxDebuggerHandler> handler(new DosboxDebuggerHandler());
+    ::std::shared_ptr<TProcessor> processor(new DosboxDebuggerProcessor(handler));
+    ::std::shared_ptr<TNonblockingServerTransport> serverTransport(new TNonblockingServerSocket(9090));
+    ::std::shared_ptr<TFramedTransportFactory> transportFactory(new TFramedTransportFactory());
+    ::std::shared_ptr<TProtocolFactory> protocolFactory(new TBinaryProtocolFactory());
+
+    srv = ::std::shared_ptr<TNonblockingServer>(new TNonblockingServer(processor, protocolFactory, serverTransport));
+    ::std::shared_ptr<ThreadFactory> tf(new ThreadFactory());
+    ::std::shared_ptr<Thread> thread = tf->newThread(srv);
+    thread->start();
+
+    atexit(stop_server);
+
+    CBreakpoint::DeleteAll();
+    debugger_break_on_exec = true;
+}
+
+void send_pause_event(bool is_step) {
+    try {
+        if(client) {
+            client->pause_event(SegValue(cs), reg_eip);
+        }
+    }
+    catch(...) {
+
+    }
+}

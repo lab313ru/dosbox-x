@@ -124,6 +124,9 @@
     <Filter Include="Sources\cpu\core_dyn_x86">
       <UniqueIdentifier>{09ec76de-76b7-416f-9a14-f47a19aabc07}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Sources\gen-cpp">
+      <UniqueIdentifier>{3c2f1210-dd77-4c91-9add-7aaa87d75b44}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\src\aviwriter\avi_rw_iobuf.cpp">
@@ -1530,6 +1533,15 @@
     <ClCompile Include="..\src\misc\savestates.cpp">
       <Filter>Sources\misc</Filter>
     </ClCompile>
+    <ClCompile Include="gen-cpp\debug_proto_types.cpp">
+      <Filter>Sources\gen-cpp</Filter>
+    </ClCompile>
+    <ClCompile Include="gen-cpp\DosboxDebugger.cpp">
+      <Filter>Sources\gen-cpp</Filter>
+    </ClCompile>
+    <ClCompile Include="gen-cpp\IdaClient.cpp">
+      <Filter>Sources\gen-cpp</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\src\aviwriter\avi.h">
@@ -2416,6 +2428,15 @@
     </ClInclude>
     <ClInclude Include="..\src\cpu\core_dyn_x86\string.h">
       <Filter>Sources\cpu\core_dyn_x86</Filter>
+    </ClInclude>
+    <ClInclude Include="gen-cpp\debug_proto_types.h">
+      <Filter>Sources\gen-cpp</Filter>
+    </ClInclude>
+    <ClInclude Include="gen-cpp\DosboxDebugger.h">
+      <Filter>Sources\gen-cpp</Filter>
+    </ClInclude>
+    <ClInclude Include="gen-cpp\IdaClient.h">
+      <Filter>Sources\gen-cpp</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
