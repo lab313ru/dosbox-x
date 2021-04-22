@@ -30,6 +30,7 @@ static ::std::shared_ptr<TTransport> cli_transport;
 
 static ::std::mutex list_mutex;
 static eventlist_t events;
+static ea_t base_addr;
 
 static const char* const flags_reg[]{
     "CF",
@@ -152,6 +153,29 @@ static void finish_execution()
     stop_server();
 }
 
+static inline ea_t find_app_base(const SegRegisters& sregs) {
+    if (client) {
+        ea_t base = (ea_t)client->get_address(sregs.CS, 0);
+        ea_t addr;
+
+        addr = (ea_t)client->get_address(sregs.DS, 0);
+
+        if(addr < base) {
+            base = addr;
+        }
+
+        addr = (ea_t)client->get_address(sregs.SS, 0);
+
+        if(addr < base) {
+            base = addr;
+        }
+
+        return base;
+    }
+
+    return 0;
+}
+
 class IdaClientHandler : virtual public IdaClientIf {
 
 public:
@@ -167,7 +191,7 @@ public:
         events.enqueue(ev, IN_BACK);
     }
 
-    void start_event(const int32_t base) override {
+    void start_event(const SegRegisters& sregs) override {
         ::std::lock_guard<::std::mutex> lock(list_mutex);
 
         debug_event_t ev;
@@ -176,10 +200,12 @@ public:
         ev.ea = BADADDR;
         ev.handled = true;
 
+        base_addr = find_app_base(sregs);
+
         ev.set_modinfo(PROCESS_STARTED).name.sprnt("dosbox");
-        ev.set_modinfo(PROCESS_STARTED).base = base;
+        ev.set_modinfo(PROCESS_STARTED).base = base_addr + 0x100;
         ev.set_modinfo(PROCESS_STARTED).size = 0;
-        ev.set_modinfo(PROCESS_STARTED).rebase_to = base;
+        ev.set_modinfo(PROCESS_STARTED).rebase_to = base_addr + 0x100;
 
         events.enqueue(ev, IN_BACK);
     }
@@ -563,9 +589,68 @@ static drc_t idaapi write_register(thid_t tid, int regidx, const regval_t* value
     return DRC_OK;
 }
 
+static bool first_info = true;
+
 static drc_t idaapi get_memory_info(meminfo_vec_t& areas, qstring* errbuf)
 {
+    if (!first_info) {
+        return DRC_NOCHG;
+    }
+
     memory_info_t info;
+    int last_user_seg = 0;
+
+    if (client) {
+        std::string mem;
+        int32_t addr = client->get_address(base_addr >> 4, 2);
+        client->read_memory(mem, addr, 2);
+        last_user_seg = *(uint16_t*)mem.c_str();
+    }
+
+    memory_info_t* mi = &areas.push_back();
+    mi->start_ea = 0x0;
+    mi->end_ea = 0x400;
+    mi->end_ea--;
+    mi->name = "INT_TABLE";
+    mi->bitness = 0;
+    mi->perm = SEGPERM_READ | SEGPERM_WRITE;
+    mi->sbase = 0;
+
+    mi = &areas.push_back();
+    mi->start_ea = 0x400;
+    mi->end_ea = 0x600;
+    mi->end_ea--;
+    mi->name = "BIOS";
+    mi->bitness = 0;
+    mi->perm = SEGPERM_READ;
+    mi->sbase = 0x40;
+
+    mi = &areas.push_back();
+    mi->start_ea = 0x600;
+    mi->end_ea = base_addr;
+    mi->end_ea--;
+    mi->name = "DOS?";
+    mi->bitness = 0;
+    mi->perm = SEGPERM_READ;
+    mi->sbase = 0x60;
+
+    //mi = &areas.push_back();
+    //mi->start_ea = base_addr;
+    //mi->end_ea = base_addr + 0x100;
+    //mi->end_ea--;
+    //mi->name = "PSP";
+    //mi->bitness = 0;
+    //mi->perm = SEGPERM_READ;
+    //mi->sbase = base_addr >> 4;
+
+    //mi = &areas.push_back();
+    //mi->start_ea = base_addr + 0x200;
+    //mi->end_ea = (ea_t)client->get_address(last_user_seg, 0x10);
+    //mi->end_ea--;
+    //mi->name = ".text"; // Not the best name; it also covers data/stack/...
+    //mi->bitness = 0;
+    //mi->perm = SEGPERM_READ | SEGPERM_WRITE | SEGPERM_EXEC;
+    //mi->sbase = base_addr >> 4;
 
     // Don't remove this loop
     for(int i = 0; i < get_segm_qty(); ++i)
@@ -589,6 +674,52 @@ static drc_t idaapi get_memory_info(meminfo_vec_t& areas, qstring* errbuf)
         areas.push_back(info);
     }
     // Don't remove this loop
+
+    mi = &areas.push_back();
+    mi->start_ea = 0xA0000;
+    mi->end_ea = 0xB0000;
+    mi->end_ea--;
+    mi->name = "A000";
+    mi->bitness = 0;
+    mi->perm = SEGPERM_READ;
+    mi->sbase = 0xa000;
+
+    mi = &areas.push_back();
+    mi->start_ea = 0xB0000;
+    mi->end_ea = 0xB8000;
+    mi->end_ea--;
+    mi->name = "B000";
+    mi->bitness = 0;
+    mi->perm = SEGPERM_READ | SEGPERM_WRITE;
+    mi->sbase = 0xb000;
+
+    mi = &areas.push_back();
+    mi->start_ea = 0xB8000;
+    mi->end_ea = 0xC0000;
+    mi->end_ea--;
+    mi->name = "B800";
+    mi->bitness = 0;
+    mi->perm = SEGPERM_READ | SEGPERM_WRITE;
+    mi->sbase = 0xb800;
+
+    mi = &areas.push_back();
+    mi->start_ea = 0xC0000;
+    mi->end_ea = 0xC1000;
+    mi->end_ea--;
+    mi->name = "VIDBIOS";
+    mi->bitness = 0;
+    mi->perm = SEGPERM_READ | SEGPERM_EXEC;
+    mi->sbase = 0xc000;
+
+    mi = &areas.push_back();
+    mi->start_ea = (ea_t)client->get_address(0xf100, 0);
+    mi->end_ea = (ea_t)client->get_address(0xf100, 0x1000);
+    mi->end_ea--;
+    mi->name = ".callbacks";
+    mi->perm = SEGPERM_READ | SEGPERM_WRITE | SEGPERM_EXEC;
+    mi->sbase = 0xf100;
+
+    first_info = false;
 
     return DRC_OK;
 }

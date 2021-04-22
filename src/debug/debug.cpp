@@ -4992,7 +4992,10 @@ public:
 
         try {
             if(client) {
-                client->start_event(SegPhys(cs));
+                SegRegisters sregs;
+                get_seg_regs(sregs);
+
+                client->start_event(sregs);
                 client->pause_event(SegValue(cs), reg_eip);
             }
         }
@@ -5081,6 +5084,11 @@ public:
         _return.FS_BASE = SegPhys(fs);
         _return.GS_BASE = SegPhys(gs);
         _return.SS_BASE = SegPhys(ss);
+    }
+
+
+    int32_t get_address(const int16_t seg, const int32_t offset) override {
+        return GetAddress(seg, offset);
     }
 
 };

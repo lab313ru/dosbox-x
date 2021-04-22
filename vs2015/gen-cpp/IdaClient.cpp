@@ -35,9 +35,9 @@ uint32_t IdaClient_start_event_args::read(::apache::thrift::protocol::TProtocol*
     switch (fid)
     {
       case 1:
-        if (ftype == ::apache::thrift::protocol::T_I32) {
-          xfer += iprot->readI32(this->base);
-          this->__isset.base = true;
+        if (ftype == ::apache::thrift::protocol::T_STRUCT) {
+          xfer += this->sregs.read(iprot);
+          this->__isset.sregs = true;
         } else {
           xfer += iprot->skip(ftype);
         }
@@ -59,8 +59,8 @@ uint32_t IdaClient_start_event_args::write(::apache::thrift::protocol::TProtocol
   ::apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
   xfer += oprot->writeStructBegin("IdaClient_start_event_args");
 
-  xfer += oprot->writeFieldBegin("base", ::apache::thrift::protocol::T_I32, 1);
-  xfer += oprot->writeI32(this->base);
+  xfer += oprot->writeFieldBegin("sregs", ::apache::thrift::protocol::T_STRUCT, 1);
+  xfer += this->sregs.write(oprot);
   xfer += oprot->writeFieldEnd();
 
   xfer += oprot->writeFieldStop();
@@ -78,8 +78,8 @@ uint32_t IdaClient_start_event_pargs::write(::apache::thrift::protocol::TProtoco
   ::apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
   xfer += oprot->writeStructBegin("IdaClient_start_event_pargs");
 
-  xfer += oprot->writeFieldBegin("base", ::apache::thrift::protocol::T_I32, 1);
-  xfer += oprot->writeI32((*(this->base)));
+  xfer += oprot->writeFieldBegin("sregs", ::apache::thrift::protocol::T_STRUCT, 1);
+  xfer += (*(this->sregs)).write(oprot);
   xfer += oprot->writeFieldEnd();
 
   xfer += oprot->writeFieldStop();
@@ -240,18 +240,18 @@ uint32_t IdaClient_stop_event_pargs::write(::apache::thrift::protocol::TProtocol
   return xfer;
 }
 
-void IdaClientClient::start_event(const int32_t base)
+void IdaClientClient::start_event(const SegRegisters& sregs)
 {
-  send_start_event(base);
+  send_start_event(sregs);
 }
 
-void IdaClientClient::send_start_event(const int32_t base)
+void IdaClientClient::send_start_event(const SegRegisters& sregs)
 {
   int32_t cseqid = 0;
   oprot_->writeMessageBegin("start_event", ::apache::thrift::protocol::T_ONEWAY, cseqid);
 
   IdaClient_start_event_pargs args;
-  args.base = &base;
+  args.sregs = &sregs;
   args.write(oprot_);
 
   oprot_->writeMessageEnd();
@@ -338,7 +338,7 @@ void IdaClientProcessor::process_start_event(int32_t, ::apache::thrift::protocol
   }
 
   try {
-    iface_->start_event(args.base);
+    iface_->start_event(args.sregs);
   } catch (const std::exception&) {
     if (this->eventHandler_.get() != nullptr) {
       this->eventHandler_->handlerError(ctx, "IdaClient.start_event");
@@ -434,19 +434,19 @@ void IdaClientProcessor::process_stop_event(int32_t, ::apache::thrift::protocol:
   return processor;
 }
 
-void IdaClientConcurrentClient::start_event(const int32_t base)
+void IdaClientConcurrentClient::start_event(const SegRegisters& sregs)
 {
-  send_start_event(base);
+  send_start_event(sregs);
 }
 
-void IdaClientConcurrentClient::send_start_event(const int32_t base)
+void IdaClientConcurrentClient::send_start_event(const SegRegisters& sregs)
 {
   int32_t cseqid = 0;
   ::apache::thrift::async::TConcurrentSendSentry sentry(this->sync_.get());
   oprot_->writeMessageBegin("start_event", ::apache::thrift::protocol::T_ONEWAY, cseqid);
 
   IdaClient_start_event_pargs args;
-  args.base = &base;
+  args.sregs = &sregs;
   args.write(oprot_);
 
   oprot_->writeMessageEnd();

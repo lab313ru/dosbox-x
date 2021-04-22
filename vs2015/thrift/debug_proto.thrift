@@ -101,6 +101,7 @@ service DosboxDebugger {
   FpuRegisters get_fpu_regs(),
   void set_fpu_reg(1:FpuRegister reg, 2:double value),
 
+  i32 get_address(1:i16 seg, 2:i32 offset),
   binary read_memory(1:i32 phys_addr, 2:i32 size),
   void write_memory(1:i32 phys_addr, 2:binary data),
 
@@ -117,7 +118,7 @@ service DosboxDebugger {
 }
 
 service IdaClient {
-  oneway void start_event(1:i32 base),
+  oneway void start_event(1:SegRegisters sregs),
   oneway void pause_event(1:i16 seg, 2:i32 address),
   oneway void stop_event(),
 }

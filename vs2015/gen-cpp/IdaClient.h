@@ -22,7 +22,7 @@
 class IdaClientIf {
  public:
   virtual ~IdaClientIf() {}
-  virtual void start_event(const int32_t base) = 0;
+  virtual void start_event(const SegRegisters& sregs) = 0;
   virtual void pause_event(const int16_t seg, const int32_t address) = 0;
   virtual void stop_event() = 0;
 };
@@ -54,7 +54,7 @@ class IdaClientIfSingletonFactory : virtual public IdaClientIfFactory {
 class IdaClientNull : virtual public IdaClientIf {
  public:
   virtual ~IdaClientNull() {}
-  void start_event(const int32_t /* base */) {
+  void start_event(const SegRegisters& /* sregs */) {
     return;
   }
   void pause_event(const int16_t /* seg */, const int32_t /* address */) {
@@ -66,8 +66,8 @@ class IdaClientNull : virtual public IdaClientIf {
 };
 
 typedef struct _IdaClient_start_event_args__isset {
-  _IdaClient_start_event_args__isset() : base(false) {}
-  bool base :1;
+  _IdaClient_start_event_args__isset() : sregs(false) {}
+  bool sregs :1;
 } _IdaClient_start_event_args__isset;
 
 class IdaClient_start_event_args {
@@ -75,19 +75,19 @@ class IdaClient_start_event_args {
 
   IdaClient_start_event_args(const IdaClient_start_event_args&);
   IdaClient_start_event_args& operator=(const IdaClient_start_event_args&);
-  IdaClient_start_event_args() : base(0) {
+  IdaClient_start_event_args() {
   }
 
   virtual ~IdaClient_start_event_args() noexcept;
-  int32_t base;
+  SegRegisters sregs;
 
   _IdaClient_start_event_args__isset __isset;
 
-  void __set_base(const int32_t val);
+  void __set_sregs(const SegRegisters& val);
 
   bool operator == (const IdaClient_start_event_args & rhs) const
   {
-    if (!(base == rhs.base))
+    if (!(sregs == rhs.sregs))
       return false;
     return true;
   }
@@ -108,7 +108,7 @@ class IdaClient_start_event_pargs {
 
 
   virtual ~IdaClient_start_event_pargs() noexcept;
-  const int32_t* base;
+  const SegRegisters* sregs;
 
   uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
 
@@ -232,8 +232,8 @@ class IdaClientClient : virtual public IdaClientIf {
   std::shared_ptr< ::apache::thrift::protocol::TProtocol> getOutputProtocol() {
     return poprot_;
   }
-  void start_event(const int32_t base);
-  void send_start_event(const int32_t base);
+  void start_event(const SegRegisters& sregs);
+  void send_start_event(const SegRegisters& sregs);
   void pause_event(const int16_t seg, const int32_t address);
   void send_pause_event(const int16_t seg, const int32_t address);
   void stop_event();
@@ -290,13 +290,13 @@ class IdaClientMultiface : virtual public IdaClientIf {
     ifaces_.push_back(iface);
   }
  public:
-  void start_event(const int32_t base) {
+  void start_event(const SegRegisters& sregs) {
     size_t sz = ifaces_.size();
     size_t i = 0;
     for (; i < (sz - 1); ++i) {
-      ifaces_[i]->start_event(base);
+      ifaces_[i]->start_event(sregs);
     }
-    ifaces_[i]->start_event(base);
+    ifaces_[i]->start_event(sregs);
   }
 
   void pause_event(const int16_t seg, const int32_t address) {
@@ -349,8 +349,8 @@ class IdaClientConcurrentClient : virtual public IdaClientIf {
   std::shared_ptr< ::apache::thrift::protocol::TProtocol> getOutputProtocol() {
     return poprot_;
   }
-  void start_event(const int32_t base);
-  void send_start_event(const int32_t base);
+  void start_event(const SegRegisters& sregs);
+  void send_start_event(const SegRegisters& sregs);
   void pause_event(const int16_t seg, const int32_t address);
   void send_pause_event(const int16_t seg, const int32_t address);
   void stop_event();

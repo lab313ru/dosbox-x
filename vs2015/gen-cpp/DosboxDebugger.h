@@ -33,6 +33,7 @@ class DosboxDebuggerIf {
   virtual double get_fpu_reg(const FpuRegister::type reg) = 0;
   virtual void get_fpu_regs(FpuRegisters& _return) = 0;
   virtual void set_fpu_reg(const FpuRegister::type reg, const double value) = 0;
+  virtual int32_t get_address(const int16_t seg, const int32_t offset) = 0;
   virtual void read_memory(std::string& _return, const int32_t phys_addr, const int32_t size) = 0;
   virtual void write_memory(const int32_t phys_addr, const std::string& data) = 0;
   virtual void add_breakpoint(const DbgBreakpoint& bpt) = 0;
@@ -108,6 +109,10 @@ class DosboxDebuggerNull : virtual public DosboxDebuggerIf {
   }
   void set_fpu_reg(const FpuRegister::type /* reg */, const double /* value */) {
     return;
+  }
+  int32_t get_address(const int16_t /* seg */, const int32_t /* offset */) {
+    int32_t _return = 0;
+    return _return;
   }
   void read_memory(std::string& /* _return */, const int32_t /* phys_addr */, const int32_t /* size */) {
     return;
@@ -1252,6 +1257,117 @@ class DosboxDebugger_set_fpu_reg_presult {
 
 };
 
+typedef struct _DosboxDebugger_get_address_args__isset {
+  _DosboxDebugger_get_address_args__isset() : seg(false), offset(false) {}
+  bool seg :1;
+  bool offset :1;
+} _DosboxDebugger_get_address_args__isset;
+
+class DosboxDebugger_get_address_args {
+ public:
+
+  DosboxDebugger_get_address_args(const DosboxDebugger_get_address_args&);
+  DosboxDebugger_get_address_args& operator=(const DosboxDebugger_get_address_args&);
+  DosboxDebugger_get_address_args() : seg(0), offset(0) {
+  }
+
+  virtual ~DosboxDebugger_get_address_args() noexcept;
+  int16_t seg;
+  int32_t offset;
+
+  _DosboxDebugger_get_address_args__isset __isset;
+
+  void __set_seg(const int16_t val);
+
+  void __set_offset(const int32_t val);
+
+  bool operator == (const DosboxDebugger_get_address_args & rhs) const
+  {
+    if (!(seg == rhs.seg))
+      return false;
+    if (!(offset == rhs.offset))
+      return false;
+    return true;
+  }
+  bool operator != (const DosboxDebugger_get_address_args &rhs) const {
+    return !(*this == rhs);
+  }
+
+  bool operator < (const DosboxDebugger_get_address_args & ) const;
+
+  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
+  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
+
+};
+
+
+class DosboxDebugger_get_address_pargs {
+ public:
+
+
+  virtual ~DosboxDebugger_get_address_pargs() noexcept;
+  const int16_t* seg;
+  const int32_t* offset;
+
+  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
+
+};
+
+typedef struct _DosboxDebugger_get_address_result__isset {
+  _DosboxDebugger_get_address_result__isset() : success(false) {}
+  bool success :1;
+} _DosboxDebugger_get_address_result__isset;
+
+class DosboxDebugger_get_address_result {
+ public:
+
+  DosboxDebugger_get_address_result(const DosboxDebugger_get_address_result&);
+  DosboxDebugger_get_address_result& operator=(const DosboxDebugger_get_address_result&);
+  DosboxDebugger_get_address_result() : success(0) {
+  }
+
+  virtual ~DosboxDebugger_get_address_result() noexcept;
+  int32_t success;
+
+  _DosboxDebugger_get_address_result__isset __isset;
+
+  void __set_success(const int32_t val);
+
+  bool operator == (const DosboxDebugger_get_address_result & rhs) const
+  {
+    if (!(success == rhs.success))
+      return false;
+    return true;
+  }
+  bool operator != (const DosboxDebugger_get_address_result &rhs) const {
+    return !(*this == rhs);
+  }
+
+  bool operator < (const DosboxDebugger_get_address_result & ) const;
+
+  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
+  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
+
+};
+
+typedef struct _DosboxDebugger_get_address_presult__isset {
+  _DosboxDebugger_get_address_presult__isset() : success(false) {}
+  bool success :1;
+} _DosboxDebugger_get_address_presult__isset;
+
+class DosboxDebugger_get_address_presult {
+ public:
+
+
+  virtual ~DosboxDebugger_get_address_presult() noexcept;
+  int32_t* success;
+
+  _DosboxDebugger_get_address_presult__isset __isset;
+
+  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
+
+};
+
 typedef struct _DosboxDebugger_read_memory_args__isset {
   _DosboxDebugger_read_memory_args__isset() : phys_addr(false), size(false) {}
   bool phys_addr :1;
@@ -2130,6 +2246,9 @@ class DosboxDebuggerClient : virtual public DosboxDebuggerIf {
   void set_fpu_reg(const FpuRegister::type reg, const double value);
   void send_set_fpu_reg(const FpuRegister::type reg, const double value);
   void recv_set_fpu_reg();
+  int32_t get_address(const int16_t seg, const int32_t offset);
+  void send_get_address(const int16_t seg, const int32_t offset);
+  int32_t recv_get_address();
   void read_memory(std::string& _return, const int32_t phys_addr, const int32_t size);
   void send_read_memory(const int32_t phys_addr, const int32_t size);
   void recv_read_memory(std::string& _return);
@@ -2186,6 +2305,7 @@ class DosboxDebuggerProcessor : public ::apache::thrift::TDispatchProcessor {
   void process_get_fpu_reg(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
   void process_get_fpu_regs(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
   void process_set_fpu_reg(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
+  void process_get_address(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
   void process_read_memory(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
   void process_write_memory(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
   void process_add_breakpoint(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
@@ -2210,6 +2330,7 @@ class DosboxDebuggerProcessor : public ::apache::thrift::TDispatchProcessor {
     processMap_["get_fpu_reg"] = &DosboxDebuggerProcessor::process_get_fpu_reg;
     processMap_["get_fpu_regs"] = &DosboxDebuggerProcessor::process_get_fpu_regs;
     processMap_["set_fpu_reg"] = &DosboxDebuggerProcessor::process_set_fpu_reg;
+    processMap_["get_address"] = &DosboxDebuggerProcessor::process_get_address;
     processMap_["read_memory"] = &DosboxDebuggerProcessor::process_read_memory;
     processMap_["write_memory"] = &DosboxDebuggerProcessor::process_write_memory;
     processMap_["add_breakpoint"] = &DosboxDebuggerProcessor::process_add_breakpoint;
@@ -2349,6 +2470,15 @@ class DosboxDebuggerMultiface : virtual public DosboxDebuggerIf {
       ifaces_[i]->set_fpu_reg(reg, value);
     }
     ifaces_[i]->set_fpu_reg(reg, value);
+  }
+
+  int32_t get_address(const int16_t seg, const int32_t offset) {
+    size_t sz = ifaces_.size();
+    size_t i = 0;
+    for (; i < (sz - 1); ++i) {
+      ifaces_[i]->get_address(seg, offset);
+    }
+    return ifaces_[i]->get_address(seg, offset);
   }
 
   void read_memory(std::string& _return, const int32_t phys_addr, const int32_t size) {
@@ -2507,6 +2637,9 @@ class DosboxDebuggerConcurrentClient : virtual public DosboxDebuggerIf {
   void set_fpu_reg(const FpuRegister::type reg, const double value);
   int32_t send_set_fpu_reg(const FpuRegister::type reg, const double value);
   void recv_set_fpu_reg(const int32_t seqid);
+  int32_t get_address(const int16_t seg, const int32_t offset);
+  int32_t send_get_address(const int16_t seg, const int32_t offset);
+  int32_t recv_get_address(const int32_t seqid);
   void read_memory(std::string& _return, const int32_t phys_addr, const int32_t size);
   int32_t send_read_memory(const int32_t phys_addr, const int32_t size);
   void recv_read_memory(std::string& _return, const int32_t seqid);
