@@ -5037,6 +5037,8 @@ public:
             return SegValue(gs);
         case SegRegister::SS:
             return SegValue(ss);
+        default:
+            return 0;
         }
     }
 
