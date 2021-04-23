@@ -153,24 +153,41 @@ static void finish_execution()
     stop_server();
 }
 
+void get_callback_name(std::string& name, const int16_t index) {
+    name.clear();
+
+    try {
+        if(client) {
+            client->get_callback_name(name, index);
+        }
+    }
+    catch(...) {
+
+    }
+}
+
 static inline ea_t find_app_base(const SegRegisters& sregs) {
-    if (client) {
-        ea_t base = (ea_t)client->get_address(sregs.CS, 0);
-        ea_t addr;
+    try {
+        if(client) {
+            ea_t base = (ea_t)client->get_address(sregs.CS, 0);
+            ea_t addr;
 
-        addr = (ea_t)client->get_address(sregs.DS, 0);
+            addr = (ea_t)client->get_address(sregs.DS, 0);
 
-        if(addr < base) {
-            base = addr;
+            if(addr < base) {
+                base = addr;
+            }
+
+            addr = (ea_t)client->get_address(sregs.SS, 0);
+
+            if(addr < base) {
+                base = addr;
+            }
+
+            return base;
         }
+    } catch(...) {
 
-        addr = (ea_t)client->get_address(sregs.SS, 0);
-
-        if(addr < base) {
-            base = addr;
-        }
-
-        return base;
     }
 
     return 0;
@@ -185,7 +202,7 @@ public:
         debug_event_t ev;
         ev.pid = 1;
         ev.tid = 1;
-        ev.ea = to_ea(seg, address);
+        ev.ea = to_ea((sel_t)(seg & 0xFFFF), (uval_t)address);
         ev.handled = true;
         ev.set_eid(PROCESS_SUSPENDED);
         events.enqueue(ev, IN_BACK);
@@ -395,17 +412,15 @@ static void rebase_sregs(const SegRegisters& regs) {
             continue;
         }
 
+        // update segreg change points
         int sra_num = get_sreg_ranges_qty(sr);
         for(int i = 0; i < sra_num; ++i)
         {
             sreg_range_t sra;
             if(!getn_sreg_range(&sra, sr, i))
                 break;
-            sel_t reg = sra.val;
-            if(reg != BADSEL)
-            {
-                split_sreg_range(sra.start_ea, sr, value, SR_user, true);
-            }
+
+            split_sreg_range(sra.start_ea, sr, value, SR_user, true);
         }
     }
 }
@@ -421,7 +436,7 @@ static drc_t idaapi s_set_resume_mode(thid_t tid, resume_mode_t resmod) // Run o
             if(client) {
                 client->step_into();
                 client->get_seg_regs(regs);
-                rebase_sregs(regs);
+                //rebase_sregs(regs);
             }
         }
         catch(...) {
@@ -434,7 +449,7 @@ static drc_t idaapi s_set_resume_mode(thid_t tid, resume_mode_t resmod) // Run o
             if(client) {
                 client->step_over();
                 client->get_seg_regs(regs);
-                rebase_sregs(regs);
+                //rebase_sregs(regs);
             }
         }
         catch(...) {
@@ -461,27 +476,27 @@ static drc_t idaapi read_registers(thid_t tid, int clsmask, regval_t* values, qs
                 sregs_filled = true;
 
                 values[static_cast<int>(DBG_REGS::R_AX)].ival = regs.EAX & 0xFFFF;
-                values[static_cast<int>(DBG_REGS::R_AX_DS)].ival = to_ea(sregs.DS, regs.EAX & 0xFFFF);
-                values[static_cast<int>(DBG_REGS::R_AX_CS)].ival = to_ea(sregs.CS, regs.EAX & 0xFFFF);
+                values[static_cast<int>(DBG_REGS::R_AX_DS)].ival = to_ea((sel_t)(sregs.DS & 0xFFFF), (uval_t)(regs.EAX & 0xFFFF));
+                values[static_cast<int>(DBG_REGS::R_AX_CS)].ival = to_ea((sel_t)(sregs.CS & 0xFFFF), (uval_t)(regs.EAX & 0xFFFF));
                 values[static_cast<int>(DBG_REGS::R_BX)].ival = regs.EBX & 0xFFFF;
-                values[static_cast<int>(DBG_REGS::R_BX_DS)].ival = to_ea(sregs.DS, regs.EBX & 0xFFFF);
-                values[static_cast<int>(DBG_REGS::R_BX_CS)].ival = to_ea(sregs.CS, regs.EBX & 0xFFFF);
+                values[static_cast<int>(DBG_REGS::R_BX_DS)].ival = to_ea((sel_t)(sregs.DS & 0xFFFF), (uval_t)(regs.EBX & 0xFFFF));
+                values[static_cast<int>(DBG_REGS::R_BX_CS)].ival = to_ea((sel_t)(sregs.CS & 0xFFFF), (uval_t)(regs.EBX & 0xFFFF));
                 values[static_cast<int>(DBG_REGS::R_CX)].ival = regs.ECX & 0xFFFF;
-                values[static_cast<int>(DBG_REGS::R_CX_DS)].ival = to_ea(sregs.DS, regs.ECX & 0xFFFF);
-                values[static_cast<int>(DBG_REGS::R_CX_CS)].ival = to_ea(sregs.CS, regs.ECX & 0xFFFF);
+                values[static_cast<int>(DBG_REGS::R_CX_DS)].ival = to_ea((sel_t)(sregs.DS & 0xFFFF), (uval_t)(regs.ECX & 0xFFFF));
+                values[static_cast<int>(DBG_REGS::R_CX_CS)].ival = to_ea((sel_t)(sregs.CS & 0xFFFF), (uval_t)(regs.ECX & 0xFFFF));
                 values[static_cast<int>(DBG_REGS::R_DX)].ival = regs.EDX & 0xFFFF;
-                values[static_cast<int>(DBG_REGS::R_DX_DS)].ival = to_ea(sregs.DS, regs.EDX & 0xFFFF);
-                values[static_cast<int>(DBG_REGS::R_DX_CS)].ival = to_ea(sregs.CS, regs.EDX & 0xFFFF);
+                values[static_cast<int>(DBG_REGS::R_DX_DS)].ival = to_ea((sel_t)(sregs.DS & 0xFFFF), (uval_t)(regs.EDX & 0xFFFF));
+                values[static_cast<int>(DBG_REGS::R_DX_CS)].ival = to_ea((sel_t)(sregs.CS & 0xFFFF), (uval_t)(regs.EDX & 0xFFFF));
                 values[static_cast<int>(DBG_REGS::R_SI)].ival = regs.ESI & 0xFFFF;
-                values[static_cast<int>(DBG_REGS::R_SI_DS)].ival = to_ea(sregs.DS, regs.ESI & 0xFFFF);
+                values[static_cast<int>(DBG_REGS::R_SI_DS)].ival = to_ea((sel_t)(sregs.DS & 0xFFFF), (uval_t)(regs.ESI & 0xFFFF));
                 values[static_cast<int>(DBG_REGS::R_DI)].ival = regs.EDI & 0xFFFF;
-                values[static_cast<int>(DBG_REGS::R_DI_ES)].ival = to_ea(sregs.ES, regs.EDI & 0xFFFF);
+                values[static_cast<int>(DBG_REGS::R_DI_ES)].ival = to_ea((sel_t)(sregs.ES & 0xFFFF), (uval_t)(regs.EDI & 0xFFFF));
                 values[static_cast<int>(DBG_REGS::R_BP)].ival = regs.EBP & 0xFFFF;
-                values[static_cast<int>(DBG_REGS::R_BP_SS)].ival = to_ea(sregs.SS, regs.EBP & 0xFFFF);
+                values[static_cast<int>(DBG_REGS::R_BP_SS)].ival = to_ea((sel_t)(sregs.SS & 0xFFFF), (uval_t)(regs.EBP & 0xFFFF));
                 values[static_cast<int>(DBG_REGS::R_SP)].ival = regs.ESP & 0xFFFF;
-                values[static_cast<int>(DBG_REGS::R_SP_SS)].ival = to_ea(sregs.SS, regs.ESP & 0xFFFF);
+                values[static_cast<int>(DBG_REGS::R_SP_SS)].ival = to_ea((sel_t)(sregs.SS & 0xFFFF), (uval_t)(regs.ESP & 0xFFFF));
                 values[static_cast<int>(DBG_REGS::R_IP)].ival = regs.EIP & 0xFFFF;
-                values[static_cast<int>(DBG_REGS::R_IP_CS)].ival = to_ea(sregs.CS, regs.EIP & 0xFFFF);
+                values[static_cast<int>(DBG_REGS::R_IP_CS)].ival = to_ea((sel_t)(sregs.CS & 0xFFFF), (uval_t)(regs.EIP & 0xFFFF));
                 values[static_cast<int>(DBG_REGS::R_EFL)].ival = regs.FLAGS & 0xFFFF;
             }
         }
@@ -600,18 +615,23 @@ static drc_t idaapi get_memory_info(meminfo_vec_t& areas, qstring* errbuf)
     memory_info_t info;
     int last_user_seg = 0;
 
-    if (client) {
-        std::string mem;
-        int32_t addr = client->get_address(base_addr >> 4, 2);
-        client->read_memory(mem, addr, 2);
-        last_user_seg = *(uint16_t*)mem.c_str();
+    try {
+        if (client) {
+            std::string mem;
+            int32_t addr = client->get_address(base_addr >> 4, 2);
+            client->read_memory(mem, addr, 2);
+            last_user_seg = *(uint16_t*)mem.c_str();
+        }
+    }
+    catch(...) {
+        return DRC_FAILED;
     }
 
     memory_info_t* mi = &areas.push_back();
     mi->start_ea = 0x0;
     mi->end_ea = 0x400;
     mi->end_ea--;
-    mi->name = "INT_TABLE";
+    mi->name = "INTS";
     mi->bitness = 0;
     mi->perm = SEGPERM_READ | SEGPERM_WRITE;
     mi->sbase = 0;
@@ -712,12 +732,12 @@ static drc_t idaapi get_memory_info(meminfo_vec_t& areas, qstring* errbuf)
     mi->sbase = 0xc000;
 
     mi = &areas.push_back();
-    mi->start_ea = (ea_t)client->get_address(0xf100, 0);
-    mi->end_ea = (ea_t)client->get_address(0xf100, 0x1000);
+    mi->start_ea = (ea_t)client->get_address(0xf000, 0);
+    mi->end_ea = (ea_t)client->get_address(0xf000, 0x10000);
     mi->end_ea--;
-    mi->name = ".callbacks";
+    mi->name = "BIOS_MEM";
     mi->perm = SEGPERM_READ | SEGPERM_WRITE | SEGPERM_EXEC;
-    mi->sbase = 0xf100;
+    mi->sbase = 0xf000;
 
     first_info = false;
 
@@ -866,20 +886,20 @@ static drc_t map_address(ea_t* mapped, ea_t off, const regval_t* regs, int regnu
     case static_cast<int>(DBG_REGS::R_BX):
     case static_cast<int>(DBG_REGS::R_CX):
     case static_cast<int>(DBG_REGS::R_DX):
-        *mapped = to_ea(regs[static_cast<sel_t>(DBG_REGS::R_DS)].ival, add);
+        *mapped = to_ea((sel_t)(regs[static_cast<sel_t>(DBG_REGS::R_DS)].ival & 0xFFFF), (uval_t)add);
         break;
     case static_cast<int>(DBG_REGS::R_SP):
     case static_cast<int>(DBG_REGS::R_BP):
-        *mapped = to_ea(regs[static_cast<sel_t>(DBG_REGS::R_SS)].ival, add);
+        *mapped = to_ea((sel_t)(regs[static_cast<sel_t>(DBG_REGS::R_SS)].ival & 0xFFFF), (uval_t)add);
         break;
     case static_cast<int>(DBG_REGS::R_DI):
-        *mapped = to_ea(regs[static_cast<sel_t>(DBG_REGS::R_ES)].ival, add);
+        *mapped = to_ea((sel_t)(regs[static_cast<sel_t>(DBG_REGS::R_ES)].ival & 0xFFFF), (uval_t)add);
         break;
     case static_cast<int>(DBG_REGS::R_SI):
-        *mapped = to_ea(regs[static_cast<sel_t>(DBG_REGS::R_DS)].ival, add);
+        *mapped = to_ea((sel_t)(regs[static_cast<sel_t>(DBG_REGS::R_DS)].ival & 0xFFFF), (uval_t)add);
         break;
     case static_cast<int>(DBG_REGS::R_IP):
-        *mapped = to_ea(regs[static_cast<sel_t>(DBG_REGS::R_CS)].ival, add);
+        *mapped = to_ea((sel_t)(regs[static_cast<sel_t>(DBG_REGS::R_CS)].ival & 0xFFFF), (uval_t)add);
         break;
     case static_cast<int>(DBG_REGS::R_AX_DS):
     case static_cast<int>(DBG_REGS::R_AX_CS):
@@ -908,7 +928,7 @@ static drc_t map_address(ea_t* mapped, ea_t off, const regval_t* regs, int regnu
         *mapped = BADADDR;
         break;
     default:
-        *mapped = to_ea(add, 0);
+        *mapped = to_ea((sel_t)add, 0);
         break;
     }
 
@@ -916,7 +936,7 @@ static drc_t map_address(ea_t* mapped, ea_t off, const regval_t* regs, int regnu
 }
 
 static drc_t rebase_if_required_to(ea_t new_base) {
-    ea_t currentbase = to_ea(inf.baseaddr, 0);
+    ea_t currentbase = to_ea((sel_t)(inf.baseaddr & 0xFFFF), 0);
     ea_t imagebase = new_base;
 
     if (imagebase != currentbase) {

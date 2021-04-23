@@ -115,6 +115,8 @@ service DosboxDebugger {
 
   void step_into(),
   void step_over(),
+
+  string get_callback_name(1:i16 index),
 }
 
 service IdaClient {

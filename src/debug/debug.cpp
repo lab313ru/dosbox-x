@@ -4864,6 +4864,8 @@ public:
     }
 
     void exit_emulation() override {
+        DEBUG_ShutDown(NULL);
+
         try {
             if(client) {
                 client->stop_event();
@@ -4873,7 +4875,7 @@ public:
 
         }
 
-        DEBUG_ShutDown(NULL);
+        exit(0);
     }
 
     int32_t get_cpu_reg(const CpuRegister::type reg) override {
@@ -4931,6 +4933,7 @@ public:
 
     void pause() override {
         DEBUG_EnableDebugger();
+        DbgStepInto(0, false);
     }
 
     void read_memory(std::string& _return, const int32_t address, const int32_t size) override {
@@ -5005,10 +5008,12 @@ public:
     }
 
     void step_into() override {
+        DEBUG_EnableDebugger();
         DbgStepInto(0, false);
     }
 
     void step_over() override {
+        DEBUG_EnableDebugger();
         DbgStepOver();
     }
 
@@ -5086,11 +5091,13 @@ public:
         _return.SS_BASE = SegPhys(ss);
     }
 
-
     int32_t get_address(const int16_t seg, const int32_t offset) override {
         return GetAddress(seg, offset);
     }
 
+    void get_callback_name(std::string& _return, const int16_t index) override {
+        _return = CALLBACK_GetDescription(index);
+    }
 };
 
 static void stop_server() {

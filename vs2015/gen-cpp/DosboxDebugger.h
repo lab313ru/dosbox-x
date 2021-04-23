@@ -44,6 +44,7 @@ class DosboxDebuggerIf {
   virtual void exit_emulation() = 0;
   virtual void step_into() = 0;
   virtual void step_over() = 0;
+  virtual void get_callback_name(std::string& _return, const int16_t index) = 0;
 };
 
 class DosboxDebuggerIfFactory {
@@ -142,6 +143,9 @@ class DosboxDebuggerNull : virtual public DosboxDebuggerIf {
     return;
   }
   void step_over() {
+    return;
+  }
+  void get_callback_name(std::string& /* _return */, const int16_t /* index */) {
     return;
   }
 };
@@ -2188,6 +2192,110 @@ class DosboxDebugger_step_over_presult {
 
 };
 
+typedef struct _DosboxDebugger_get_callback_name_args__isset {
+  _DosboxDebugger_get_callback_name_args__isset() : index(false) {}
+  bool index :1;
+} _DosboxDebugger_get_callback_name_args__isset;
+
+class DosboxDebugger_get_callback_name_args {
+ public:
+
+  DosboxDebugger_get_callback_name_args(const DosboxDebugger_get_callback_name_args&);
+  DosboxDebugger_get_callback_name_args& operator=(const DosboxDebugger_get_callback_name_args&);
+  DosboxDebugger_get_callback_name_args() : index(0) {
+  }
+
+  virtual ~DosboxDebugger_get_callback_name_args() noexcept;
+  int16_t index;
+
+  _DosboxDebugger_get_callback_name_args__isset __isset;
+
+  void __set_index(const int16_t val);
+
+  bool operator == (const DosboxDebugger_get_callback_name_args & rhs) const
+  {
+    if (!(index == rhs.index))
+      return false;
+    return true;
+  }
+  bool operator != (const DosboxDebugger_get_callback_name_args &rhs) const {
+    return !(*this == rhs);
+  }
+
+  bool operator < (const DosboxDebugger_get_callback_name_args & ) const;
+
+  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
+  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
+
+};
+
+
+class DosboxDebugger_get_callback_name_pargs {
+ public:
+
+
+  virtual ~DosboxDebugger_get_callback_name_pargs() noexcept;
+  const int16_t* index;
+
+  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
+
+};
+
+typedef struct _DosboxDebugger_get_callback_name_result__isset {
+  _DosboxDebugger_get_callback_name_result__isset() : success(false) {}
+  bool success :1;
+} _DosboxDebugger_get_callback_name_result__isset;
+
+class DosboxDebugger_get_callback_name_result {
+ public:
+
+  DosboxDebugger_get_callback_name_result(const DosboxDebugger_get_callback_name_result&);
+  DosboxDebugger_get_callback_name_result& operator=(const DosboxDebugger_get_callback_name_result&);
+  DosboxDebugger_get_callback_name_result() : success() {
+  }
+
+  virtual ~DosboxDebugger_get_callback_name_result() noexcept;
+  std::string success;
+
+  _DosboxDebugger_get_callback_name_result__isset __isset;
+
+  void __set_success(const std::string& val);
+
+  bool operator == (const DosboxDebugger_get_callback_name_result & rhs) const
+  {
+    if (!(success == rhs.success))
+      return false;
+    return true;
+  }
+  bool operator != (const DosboxDebugger_get_callback_name_result &rhs) const {
+    return !(*this == rhs);
+  }
+
+  bool operator < (const DosboxDebugger_get_callback_name_result & ) const;
+
+  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
+  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
+
+};
+
+typedef struct _DosboxDebugger_get_callback_name_presult__isset {
+  _DosboxDebugger_get_callback_name_presult__isset() : success(false) {}
+  bool success :1;
+} _DosboxDebugger_get_callback_name_presult__isset;
+
+class DosboxDebugger_get_callback_name_presult {
+ public:
+
+
+  virtual ~DosboxDebugger_get_callback_name_presult() noexcept;
+  std::string* success;
+
+  _DosboxDebugger_get_callback_name_presult__isset __isset;
+
+  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
+
+};
+
 class DosboxDebuggerClient : virtual public DosboxDebuggerIf {
  public:
   DosboxDebuggerClient(std::shared_ptr< ::apache::thrift::protocol::TProtocol> prot) {
@@ -2279,6 +2387,9 @@ class DosboxDebuggerClient : virtual public DosboxDebuggerIf {
   void step_over();
   void send_step_over();
   void recv_step_over();
+  void get_callback_name(std::string& _return, const int16_t index);
+  void send_get_callback_name(const int16_t index);
+  void recv_get_callback_name(std::string& _return);
  protected:
   std::shared_ptr< ::apache::thrift::protocol::TProtocol> piprot_;
   std::shared_ptr< ::apache::thrift::protocol::TProtocol> poprot_;
@@ -2316,6 +2427,7 @@ class DosboxDebuggerProcessor : public ::apache::thrift::TDispatchProcessor {
   void process_exit_emulation(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
   void process_step_into(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
   void process_step_over(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
+  void process_get_callback_name(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
  public:
   DosboxDebuggerProcessor(::std::shared_ptr<DosboxDebuggerIf> iface) :
     iface_(iface) {
@@ -2341,6 +2453,7 @@ class DosboxDebuggerProcessor : public ::apache::thrift::TDispatchProcessor {
     processMap_["exit_emulation"] = &DosboxDebuggerProcessor::process_exit_emulation;
     processMap_["step_into"] = &DosboxDebuggerProcessor::process_step_into;
     processMap_["step_over"] = &DosboxDebuggerProcessor::process_step_over;
+    processMap_["get_callback_name"] = &DosboxDebuggerProcessor::process_get_callback_name;
   }
 
   virtual ~DosboxDebuggerProcessor() {}
@@ -2572,6 +2685,16 @@ class DosboxDebuggerMultiface : virtual public DosboxDebuggerIf {
     ifaces_[i]->step_over();
   }
 
+  void get_callback_name(std::string& _return, const int16_t index) {
+    size_t sz = ifaces_.size();
+    size_t i = 0;
+    for (; i < (sz - 1); ++i) {
+      ifaces_[i]->get_callback_name(_return, index);
+    }
+    ifaces_[i]->get_callback_name(_return, index);
+    return;
+  }
+
 };
 
 // The 'concurrent' client is a thread safe client that correctly handles
@@ -2670,6 +2793,9 @@ class DosboxDebuggerConcurrentClient : virtual public DosboxDebuggerIf {
   void step_over();
   int32_t send_step_over();
   void recv_step_over(const int32_t seqid);
+  void get_callback_name(std::string& _return, const int16_t index);
+  int32_t send_get_callback_name(const int16_t index);
+  void recv_get_callback_name(std::string& _return, const int32_t seqid);
  protected:
   std::shared_ptr< ::apache::thrift::protocol::TProtocol> piprot_;
   std::shared_ptr< ::apache::thrift::protocol::TProtocol> poprot_;

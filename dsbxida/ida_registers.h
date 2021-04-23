@@ -53,3 +53,7 @@ enum class DBG_REGS : uint8_t {
     R_SEG_FIRST = R_CS,
     R_SEG_LAST = R_SS,
 };
+
+enum class dosbox_insn_type_t : uint16 {
+    DOSBOX_callback = CUSTOM_INSN_ITYPE,
+};
