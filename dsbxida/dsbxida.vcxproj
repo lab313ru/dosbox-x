@@ -118,7 +118,7 @@
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <EnableUAC>false</EnableUAC>
-      <AdditionalLibraryDirectories>D:\idasdk76\lib\x64_win_vc_32;$(SolutionDir)thrift;$(SolutionDir)thrift/libevent/lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>D:\idasdk76\lib\x64_win_vc_64;$(SolutionDir)thrift;$(SolutionDir)thrift/libevent/lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <AdditionalDependencies>ida.lib;thriftd_$(PlatformArchitecture).lib;thriftnbd_$(PlatformArchitecture).lib;event_$(PlatformArchitecture).lib;Iphlpapi.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
@@ -158,7 +158,7 @@
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <EnableUAC>false</EnableUAC>
-      <AdditionalLibraryDirectories>D:\idasdk76\lib\x64_win_vc_32;$(SolutionDir)thrift;$(SolutionDir)thrift/libevent/lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>D:\idasdk76\lib\x64_win_vc_64;$(SolutionDir)thrift;$(SolutionDir)thrift/libevent/lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <AdditionalDependencies>ida.lib;thrift_$(PlatformArchitecture).lib;thriftnb_$(PlatformArchitecture).lib;event_$(PlatformArchitecture).lib;Iphlpapi.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
