@@ -18,6 +18,7 @@ using namespace ::apache::thrift::concurrency;
 #include <auto.hpp>
 #include <segregs.hpp>
 #include <intel.hpp>
+#include <ieee.h>
 #include <mutex>
 
 #include "ida_plugin.h"
@@ -591,7 +592,14 @@ static drc_t idaapi write_register(thid_t tid, int regidx, const regval_t* value
             }
             if(regidx >= static_cast<int>(DBG_REGS::R_ST0) && regidx <= static_cast<int>(DBG_REGS::R_ST7)) {
                 double tmp;
+#if IDA_SDK_VERSION >= 760
                 value->fval.to_double(&tmp);
+#else
+                uint16_t vals[IEEE_NE];
+                for (auto i = 0; i < IEEE_NE; ++i) { vals[i] = value->fval[i]; }
+
+                tmp = ieee_realcvt(&tmp, vals, 8|(sizeof(tmp)/2-1));
+#endif
 
                 client->set_fpu_reg(static_cast<FpuRegister::type>(regidx), tmp);
             }
