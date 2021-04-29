@@ -612,13 +612,9 @@ static drc_t idaapi write_register(thid_t tid, int regidx, const regval_t* value
     return DRC_OK;
 }
 
-static bool first_info = true;
-
 static drc_t idaapi get_memory_info(meminfo_vec_t& areas, qstring* errbuf)
 {
-    if (!first_info) {
-        return DRC_NOCHG;
-    }
+    areas.clear();
 
     memory_info_t info;
     int last_user_seg = 0;
@@ -746,8 +742,6 @@ static drc_t idaapi get_memory_info(meminfo_vec_t& areas, qstring* errbuf)
     mi->name = "BIOS_MEM";
     mi->perm = SEGPERM_READ | SEGPERM_WRITE | SEGPERM_EXEC;
     mi->sbase = 0xf000;
-
-    first_info = false;
 
     return DRC_OK;
 }
